@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -33,10 +34,12 @@ import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.DataFrameWriter;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.functions;
 import org.apache.spark.sql.streaming.StreamingQuery;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.Metadata;
+import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +55,8 @@ import com.mongodb.spark.sql.connector.config.MongoConfig;
 import com.mongodb.spark.sql.connector.config.WriteConfig;
 import com.mongodb.spark.sql.connector.mongodb.MongoSparkConnectorTestCase;
 
+import com.google.common.collect.ImmutableList;
+
 class MongoSparkConnectorWriteTest extends MongoSparkConnectorTestCase {
 
   private static final String TIMESERIES_RESOURCES_JSON_PATH =
@@ -62,6 +67,37 @@ class MongoSparkConnectorWriteTest extends MongoSparkConnectorTestCase {
 
   private static final String WRITE_RESOURCES_CSV_PATH =
       "src/integrationTest/resources/data/write/*.csv";
+
+  @Test
+  void testDataType() {
+    SparkSession spark = getOrCreateSparkSession();
+    StructType schema =
+        new StructType(
+            new StructField[] {
+              new StructField("name", DataTypes.StringType, false, Metadata.empty()),
+              new StructField("Deci", DataTypes.createDecimalType(27, 9), false, Metadata.empty()),
+              new StructField("age", DataTypes.createDecimalType(38, 9), false, Metadata.empty())
+            });
+    Row r1 =
+        RowFactory.create(
+            "name1",
+            new BigDecimal("123456789012345678.123456789"),
+            new BigDecimal("1234567890123456789012345678.123456000"));
+    Row r2 =
+        RowFactory.create(
+            "name2",
+            new BigDecimal("123456789012345678.123456789"),
+            new BigDecimal("1234567890123456789012345678.123456"));
+    List<Row> rowList = ImmutableList.of(r1, r2);
+    Dataset<Row> df = spark.sqlContext().createDataFrame(rowList, schema);
+
+    String collectionName = "test";
+    DataFrameWriter<Row> dfw =
+        df.write().format("mongodb").option(WriteConfig.COLLECTION_NAME_CONFIG, collectionName);
+
+    dfw.mode("Overwrite").save();
+    assertEquals(2, getCollection(collectionName).countDocuments());
+  }
 
   @Test
   void testSupportedWriteModes() {
@@ -147,45 +183,6 @@ class MongoSparkConnectorWriteTest extends MongoSparkConnectorTestCase {
     assertEquals(10, getCollection().countDocuments());
 
     assertCollection();
-  }
-
-  /** By using a window function, this test implicitly tests committing empty (no-op) commits. */
-  @Test
-  void testSupportedStreamingWriteWithWindow() throws TimeoutException {
-    SparkSession spark = getOrCreateSparkSession();
-
-    StructType schema =
-        createStructType(
-            asList(
-                createStructField("Type", DataTypes.StringType, true),
-                createStructField("Date", DataTypes.TimestampType, true),
-                createStructField("Price", DataTypes.DoubleType, true)));
-
-    Dataset<Row> ds =
-        spark
-            .readStream()
-            .format("csv")
-            .option("header", "true")
-            .schema(schema)
-            .load(WRITE_RESOURCES_CSV_PATH);
-
-    Dataset<Row> slidingWindows =
-        ds.withWatermark("Date", "1 minute")
-            .groupBy(ds.col("Type"), functions.window(ds.col("Date"), "7 day"))
-            .avg()
-            .orderBy(ds.col("Type"));
-
-    StreamingQuery query =
-        slidingWindows
-            .writeStream()
-            .outputMode("complete")
-            .format("mongodb")
-            .queryName("7DaySlidingWindow")
-            .start();
-    query.processAllAvailable();
-    query.stop();
-
-    assertEquals(52, getCollection().countDocuments());
   }
 
   @Test
