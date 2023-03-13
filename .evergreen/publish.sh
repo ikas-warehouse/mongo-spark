@@ -10,7 +10,7 @@ set -o errexit  # Exit the script with error if any of the commands fail
 
 echo "Publishing"
 
-export JDK11="/opt/java/jdk11"
+export JDK11="D:\application\jdk11"
 export JAVA_HOME=$JDK11
 
 RELEASE=${RELEASE:false}
