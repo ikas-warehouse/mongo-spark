@@ -354,18 +354,17 @@ public final class InferSchema {
 
   private static DataType dataTypeCheckStructTypeToMapType(
       final DataType dataType, final ReadConfig readConfig) {
-    //    if (dataType instanceof StructType) {
-    //      StructType structType = (StructType) dataType;
-    //      if (readConfig.inferSchemaMapType()
-    //          && structType.fields().length >= readConfig.getInferSchemaMapTypeMinimumKeySize()) {
-    //        DataType valueType =
-    //            Arrays.stream(structType.fields())
-    //                .map(StructField::dataType)
-    //                .reduce(PLACE_HOLDER_DATA_TYPE, (dt1, dt2) -> compatibleType(dt1, dt2,
-    // readConfig));
-    //        return DataTypes.createMapType(DataTypes.StringType, valueType, true);
-    //      }
-    //    }
+    if (dataType instanceof StructType) {
+      StructType structType = (StructType) dataType;
+      if (readConfig.inferSchemaMapType()
+          && structType.fields().length >= readConfig.getInferSchemaMapTypeMinimumKeySize()) {
+        DataType valueType =
+            Arrays.stream(structType.fields())
+                .map(StructField::dataType)
+                .reduce(PLACE_HOLDER_DATA_TYPE, (dt1, dt2) -> compatibleType(dt1, dt2, readConfig));
+        return DataTypes.createMapType(DataTypes.StringType, valueType, true);
+      }
+    }
     return dataType;
   }
 

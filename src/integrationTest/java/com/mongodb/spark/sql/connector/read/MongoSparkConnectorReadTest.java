@@ -40,8 +40,8 @@ class MongoSparkConnectorReadTest extends MongoSparkConnectorTestCase {
                 "mongodb://:27017/db_name?slaveOk=true")
             .option("database", "db_name")
             .option("collection", "PythonExecutor_df1_42_4399_20242")
-            .load()
-            .limit(2);
+            .option("sql.inferSchema.mapTypes.enabled", false)
+            .load();
     dataset.show();
   }
 }
