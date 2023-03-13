@@ -37,8 +37,8 @@ class MongoSparkConnectorReadTest extends MongoSparkConnectorTestCase {
             .format("mongodb")
             .option(
                 "connection.uri",
-                "mongodb://192.168.11.138:27017,192.168.11.139:27017,192.168.11.140:27017/ai_model_dev?slaveOk=true")
-            .option("database", "ai_model_dev")
+                "mongodb://:27017/db_name?slaveOk=true")
+            .option("database", "db_name")
             .option("collection", "PythonExecutor_df1_42_4399_20242")
             .load()
             .limit(2);
